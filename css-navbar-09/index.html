@@ -1,0 +1,70 @@
+<!-- index.html -->
+
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- demo only (not part of the original post): page backdrop so the
+         glass effect is visible when you open this file directly -->
+    <style>
+      /* the carousel never showed a reset, but the original clearly had one --
+         without it the UA margin/padding on <ul> knocks the menu off-centre */
+      * { margin: 0; padding: 0; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, sans-serif;
+        color: #fff;
+        background:
+          radial-gradient(120% 90% at 50% 0%, #3a4a6b 0%, #141a2a 55%, #0a0d16 100%);
+      }
+      .material-symbols-outlined { cursor: pointer; opacity: 0.6; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <img class="logo" src="logo.svg" />
+      <div class="menu">
+        <div class="menu-inner">
+          <ul>
+            <li>About</li>
+            <li>Works</li>
+            <li>Socials</li>
+          </ul>
+          <div class="submenu">
+            <div class="submenu-1">
+              <ul>
+                <li>Biography</li>
+                <li>Background</li>
+                <li>Interests</li>
+              </ul>
+            </div>
+            <!-- more submenus -->
+            <!-- submenu-2 / submenu-3 were only hinted at in the post
+                 ("more submenus"); filled in here so the CSS below has
+                 something to target. -->
+            <div class="submenu-2">
+              <ul>
+                <li>Projects</li>
+                <li>Clients</li>
+                <li>Archive</li>
+              </ul>
+            </div>
+            <div class="submenu-3">
+              <ul>
+                <li>Instagram</li>
+                <li>Facebook</li>
+                <li>LinkedIn</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul>
+        <li>Contact</li>
+      </ul>
+      <span class="material-symbols-outlined"> settings </span>
+    </nav>
+  </body>
+</html>
