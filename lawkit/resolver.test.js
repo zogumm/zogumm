@@ -133,7 +133,7 @@ test('그 외 용도는 GB 기본 20% 로 떨어진다', () => {
 /* ---------------- cap: 일반 대지에서는 min 이 맞다 ---------------- */
 
 test('구역이 없으면 조례가 법정상한을 깎는다 (cap)', () => {
-  const r = resolve({ 대지면적: 331, 용도지역: '자연녹지지역', 구역: [] }, { rules });
+  const r = resolve({ 대지면적: 331, 용도지역: '자연녹지지역', 구역: [], 시도: '서울특별시' }, { rules });
 
   assert.equal(r.status, STATUS.OK);
   assert.equal(r.track, '국토계획법');
@@ -143,8 +143,47 @@ test('구역이 없으면 조례가 법정상한을 깎는다 (cap)', () => {
 });
 
 test('미검수 시드표를 쓰면 경고가 붙는다', () => {
-  const r = resolve({ 대지면적: 331, 용도지역: '자연녹지지역', 구역: [] }, { rules });
+  const r = resolve({ 대지면적: 331, 용도지역: '자연녹지지역', 구역: [], 시도: '서울특별시' }, { rules });
   assert.match(r.경고.join(' '), /미검수/);
+});
+
+/* ---------------- 다른 지번으로 넘어갈 때 조용히 틀리는 자리 ---------------- */
+
+test('지구단위계획구역이면 조례값을 내지 않는다 — 결정조서가 우선한다', () => {
+  const r = resolve(
+    { 대지면적: 300, 용도지역: '제2종일반주거지역', 구역: ['지구단위계획구역'], 시도: '서울특별시' },
+    { rules },
+  );
+
+  assert.equal(r.status, STATUS.NEEDS_REVIEW);
+  assert.equal(r.건폐율, undefined, '조례 60% 를 그대로 내보내면 안 된다');
+  assert.match(r.확인대상.join(' '), /결정조서/);
+});
+
+test('서울 기준표를 다른 시·도 필지에 쓰지 않는다', () => {
+  const r = resolve(
+    { 대지면적: 300, 용도지역: '제2종일반주거지역', 구역: [], 시도: '경기도' },
+    { rules },
+  );
+
+  assert.equal(r.status, STATUS.NEEDS_REVIEW);
+  assert.equal(r.건폐율, undefined);
+  assert.match(r.메시지, /서울특별시 조례/);
+});
+
+test('시·도를 안 주면 조례를 적용하지 않는다', () => {
+  const r = resolve({ 대지면적: 300, 용도지역: '제2종일반주거지역', 구역: [] }, { rules });
+  assert.equal(r.status, STATUS.NEEDS_REVIEW);
+  assert.match(r.메시지, /미입력/);
+});
+
+test('시드표에 없는 용도지역은 막힌다', () => {
+  const r = resolve(
+    { 대지면적: 300, 용도지역: '일반상업지역', 구역: [], 시도: '서울특별시' },
+    { rules },
+  );
+  assert.equal(r.status, STATUS.NEEDS_REVIEW);
+  assert.equal(r.건폐율, undefined);
 });
 
 /* ---------------- 회귀: 20% 사고 ---------------- */
@@ -179,7 +218,7 @@ test('회귀 — 지하층 미확정 사실이 결과에 실려 나간다', () =
 test('모든 확정 결과는 근거를 달고 나온다', () => {
   const cases = [
     { ...대지, 용도: '단독주택', 자격: '지정당시거주자' },
-    { 대지면적: 331, 용도지역: '자연녹지지역', 구역: [] },
+    { 대지면적: 331, 용도지역: '자연녹지지역', 구역: [], 시도: '서울특별시' },
   ];
   for (const c of cases) {
     const r = resolve(c, { rules });
