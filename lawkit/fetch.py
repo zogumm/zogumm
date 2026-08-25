@@ -240,6 +240,41 @@ def cmd_fetch(args):
         print("실패 건은 laws.py 의 법령명을 국가법령정보센터 표기와 맞춰주세요.")
 
 
+def load_rules():
+    """rules/*.json 을 읽는다. 어떤 룰이 어느 법령을 옮긴 것인지 대조하기 위해서."""
+    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules")
+    out = []
+    if not os.path.isdir(d):
+        return out
+    for f in sorted(os.listdir(d)):
+        if not f.endswith(".json"):
+            continue
+        with open(os.path.join(d, f), encoding="utf-8") as fh:
+            out.append(json.load(fh))
+    return out
+
+
+def stale_rules(manifest):
+    """
+    룰이 최신 법령 기준인지 본다.
+
+    계산은 항상 최신 법으로 한다. 그래서 확인해야 할 건 딱 하나 —
+    이 룰이 옮겨 적은 시점의 법령이 아직도 최신인가.
+    """
+    rows = []
+    for rule in load_rules():
+        법령 = rule.get("법령")
+        meta = manifest.get(법령)
+        기준 = rule.get("기준시행일")
+        현재 = meta.get("시행일자") if meta else None
+
+        if 기준 is None:
+            rows.append((rule.get("id"), 법령, "미기록", 현재 or "?"))
+        elif 현재 and 기준 != 현재:
+            rows.append((rule.get("id"), 법령, 기준, 현재))
+    return rows
+
+
 def cmd_check(args):
     """저장된 시행일자와 현재 시행일자를 비교한다. 첫 화면 알림의 원천."""
     manifest = load_manifest()
@@ -260,15 +295,26 @@ def cmd_check(args):
         if meta["시행일자"] != old.get("시행일자"):
             changed.append((name, old.get("시행일자"), meta["시행일자"]))
 
-    if not changed:
+    if changed:
+        print(f"\n⚠ 개정 감지 {len(changed)}건\n")
+        for name, before, after in changed:
+            print(f"  {name}")
+            print(f"    시행일 {before} → {after}")
+        print("\n→ fetch 를 다시 돌린 뒤, 해당 법령을 쓰는 룰을 검수하세요.")
+    else:
         print("개정 없음. 모든 법령이 최신입니다.")
-        return 0
 
-    print(f"\n⚠ 개정 감지 {len(changed)}건\n")
-    for name, before, after in changed:
-        print(f"  {name}")
-        print(f"    시행일 {before} → {after}")
-    print("\n→ fetch 를 다시 돌린 뒤, 해당 법령을 쓰는 룰을 검수하세요.")
+    # 계산은 항상 최신 법으로 한다. 그러니 확인할 건 룰이 아직 최신인지 하나뿐이다.
+    stale = stale_rules(manifest)
+    if stale:
+        print(f"\n⚠ 최신 확인 안 되는 룰 {len(stale)}건\n")
+        for rid, 법령, 기준, 현재 in stale:
+            print(f"  {rid}  ({법령})")
+            print(f"    룰 기준 {기준}  /  현재 시행 {현재}")
+        print("\n→ 룰을 다시 대조하고 기준시행일을 갱신하세요.")
+    else:
+        print("모든 룰이 최신 법령 기준입니다.")
+
     return 0
 
 

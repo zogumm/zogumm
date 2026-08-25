@@ -165,5 +165,28 @@ class PlanAttachment(unittest.TestCase):
         self.assertLessEqual(len(fname), 84)  # 80자 + 확장자
 
 
+class StaleRules(unittest.TestCase):
+    """계산은 항상 최신 법으로 한다. 그래서 확인할 건 '룰이 최신인가' 하나뿐이다."""
+
+    def setUp(self):
+        from fetch import stale_rules
+        self.stale_rules = stale_rules
+
+    def test_기준시행일이_미기록이면_잡아낸다(self):
+        # rules/ 의 실제 룰을 읽는다. gb-chwirak 은 아직 기준시행일이 null 이다.
+        manifest = {"개발제한구역의 지정 및 관리에 관한 특별조치법 시행령":
+                    {"시행일자": "20260701"}}
+        rows = self.stale_rules(manifest)
+        ids = [r[0] for r in rows]
+
+        self.assertIn("gb-chwirak", ids)
+        기준 = [r[2] for r in rows if r[0] == "gb-chwirak"][0]
+        self.assertEqual(기준, "미기록")
+
+    def test_manifest가_비어도_터지지_않는다(self):
+        rows = self.stale_rules({})
+        self.assertTrue(all(len(r) == 4 for r in rows))
+
+
 if __name__ == "__main__":
     unittest.main()
