@@ -150,6 +150,30 @@ resolve({
 | 06 부속 규제 | 없음 — 주차·조경·일조 미착수 |
 | 07 근거 기록 | 일부 — 결과에 `근거[]` 는 실리나, 룰 버전 기록 없음 |
 
+### 다음 할 것 — 별표1 원문 확보
+
+PC에서 아래를 실행한다. `OC` 는 국가법령정보 공동활용(open.law.go.kr)에
+오픈API를 신청한 이메일의 `@` 앞부분.
+
+```bash
+python3 lawkit/fetch.py fetch --oc nonsomkingworld
+```
+
+브라우저에서 먼저 확인하려면:
+
+```
+https://www.law.go.kr/DRF/lawSearch.do?OC=nonsomkingworld&target=law&type=JSON&query=개발제한구역의 지정 및 관리에 관한 특별조치법 시행령
+```
+
+응답의 `법령일련번호` 를 아래 `MST` 에 넣으면 본문 + 별표 목록이 나온다.
+
+```
+https://www.law.go.kr/DRF/lawService.do?OC=nonsomkingworld&target=law&type=JSON&MST=<법령일련번호>
+```
+
+필요한 건 **별표1 제5호 가목·라목** 과 **제26조**. 이 둘이면
+지하층 산입 여부와 근생 허용 업종이 같이 닫히고 룰이 검수완료로 넘어간다.
+
 - `rules/gb-chwirak.json` — **미검수.** 별표1 원문 대조 전.
 - `resolver.js` 의 `용도지역시드` — **미검수.** 쓰면 결과에 경고가 붙는다.
 - 미해결: 지하층이 연면적 캡에 산입되는지. 강남구청 질의 필요.
