@@ -73,6 +73,50 @@ def as_list(x):
     return x if isinstance(x, list) else [x]
 
 
+def 제목(row):
+    """법령은 '법령명한글', 자치법규는 '자치법규명' 으로 필드명이 다르다."""
+    return (row.get("법령명한글") or row.get("자치법규명") or "").strip()
+
+
+def parse_search(data, name, target):
+    """
+    검색 응답에서 메타 1건을 뽑는다. 네트워크와 분리된 순수 함수라 테스트할 수 있다.
+
+    법제처 응답은 결과가 1건이면 dict, 여러 건이면 list 로 온다.
+    중첩 깊이도 target 마다 달라서 dig 로 훑는다.
+    """
+    rows = [r for r in as_list(dig(data, "law") or dig(data, "ordin")) if isinstance(r, dict)]
+
+    # 결과 0건이면 래퍼({"totalCnt": "0"})만 남는다. 레코드처럼 생긴 것만 남긴다.
+    rows = [r for r in rows
+            if 제목(r) or r.get("법령일련번호") or r.get("자치법규일련번호")]
+
+    if not rows:
+        return None, "검색 결과 없음 (법령명 확인 필요)"
+
+    # "건축법" 으로 검색하면 시행령·시행규칙이 같이 온다. 정확히 일치하는 걸 우선한다.
+    exact = [r for r in rows if 제목(r) == name]
+    row = exact[0] if exact else rows[0]
+
+    meta = {
+        "요청명": name,
+        "법령명": 제목(row),
+        "target": target,
+        "MST": row.get("법령일련번호") or row.get("자치법규일련번호"),
+        "ID": row.get("법령ID") or row.get("자치법규ID"),
+        "공포일자": row.get("공포일자"),
+        "시행일자": row.get("시행일자"),
+    }
+    if not meta["MST"]:
+        return None, f"일련번호(MST) 없음 — 응답 구조 확인 필요: {list(row)[:6]}"
+    return meta, None
+
+
+def parse_byeolpyo(parsed):
+    """본문 응답에서 별표 목록을 뽑는다."""
+    return [b for b in as_list(dig(parsed, "별표단위")) if isinstance(b, dict)]
+
+
 def search(oc, name, target):
     """법령명으로 검색해 가장 잘 맞는 1건의 메타를 돌려준다."""
     q = urllib.parse.quote(name)
@@ -81,28 +125,7 @@ def search(oc, name, target):
         data = json.loads(get(url))
     except Exception as e:
         return None, f"검색 실패: {e}"
-
-    rows = as_list(dig(data, "law") or dig(data, "LawSearch"))
-    rows = [r for r in rows if isinstance(r, dict)]
-    if not rows:
-        return None, "검색 결과 없음 (법령명 확인 필요)"
-
-    # 법령명이 정확히 일치하는 걸 우선한다. 시행령/시행규칙이 섞여 나오기 때문.
-    def title(r):
-        return (r.get("법령명한글") or r.get("자치법규명") or "").strip()
-
-    exact = [r for r in rows if title(r) == name]
-    row = exact[0] if exact else rows[0]
-
-    return {
-        "요청명": name,
-        "법령명": title(row),
-        "target": target,
-        "MST": row.get("법령일련번호") or row.get("자치법규일련번호"),
-        "ID": row.get("법령ID") or row.get("자치법규ID"),
-        "공포일자": row.get("공포일자"),
-        "시행일자": row.get("시행일자"),
-    }, None
+    return parse_search(data, name, target)
 
 
 def fetch_body(oc, meta):
@@ -122,7 +145,26 @@ def fetch_body(oc, meta):
     except Exception:
         return d, []
 
-    return d, [b for b in as_list(dig(parsed, "별표단위")) if isinstance(b, dict)]
+    return d, parse_byeolpyo(parsed)
+
+
+def plan_attachment(b):
+    """
+    별표 1건에서 (라벨, 다운로드 URL, 저장 파일명) 을 만든다.
+    링크가 없으면 url 이 None 이다. 네트워크를 타지 않으므로 테스트할 수 있다.
+    """
+    num = (b.get("별표번호") or "").strip()
+    title = (b.get("별표제목") or "").strip()
+    link = (b.get("별표서식파일링크") or b.get("별표서식PDF파일링크") or "").strip()
+
+    label = f"별표{num} {title}".strip()
+    if not link:
+        return label, None, None
+
+    url = link if link.startswith("http") else BASE + link
+    ext = ".pdf" if "PDF" in link.upper() else ".hwp"
+    safe = "".join(c for c in label if c not in '\\/:*?"<>|').strip()[:80]
+    return label, url, safe + ext
 
 
 def fetch_attachments(d, byeolpyo):
@@ -131,18 +173,10 @@ def fetch_attachments(d, byeolpyo):
     adir = os.path.join(d, "별표")
 
     for b in byeolpyo:
-        num = (b.get("별표번호") or "").strip()
-        title = (b.get("별표제목") or "").strip()
-        link = (b.get("별표서식파일링크") or b.get("별표서식PDF파일링크") or "").strip()
-
-        label = f"별표{num} {title}".strip()
-        if not link:
+        label, url, fname = plan_attachment(b)
+        if not url:
             skipped.append(f"{label} (파일 링크 없음)")
             continue
-
-        url = link if link.startswith("http") else BASE + link
-        ext = ".pdf" if "PDF" in link.upper() else ".hwp"
-        safe = "".join(c for c in label if c not in '\\/:*?"<>|').strip()[:80]
 
         try:
             blob = get(url, binary=True)
@@ -151,7 +185,7 @@ def fetch_attachments(d, byeolpyo):
             continue
 
         os.makedirs(adir, exist_ok=True)
-        with open(os.path.join(adir, safe + ext), "wb") as f:
+        with open(os.path.join(adir, fname), "wb") as f:
             f.write(blob)
         saved.append(label)
 

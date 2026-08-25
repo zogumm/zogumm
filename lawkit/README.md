@@ -22,14 +22,20 @@ const 건폐율 = Math.min(법정상한, 조례)   // 20, 20 → 20
 ## 구조
 
 ```
+check.js                CLI — 대지 조건으로 검토 1건
 resolver.js             판정 엔진 — gate → override → cap
-resolver.test.js        회귀 테스트 (271-4 포함)
+resolver.test.js        회귀 22건 (271-4 포함)
 rules/*.json            검수된 룰. 계산은 이것만 읽는다.
 laws.py                 수집 대상 법령 목록 (여기에 한 줄 추가하면 따라온다)
 fetch.py                본문 + 별표 수집 / 개정 감지
+test_fetch.py           파서 20건 — 네트워크 없이 돈다
 data/                   수집물 (gitignore)
   manifest.json         법령별 시행일자 — 개정 감지의 기준점
 ```
+
+`fetch.py` 는 파싱과 네트워크를 분리해뒀다 (`parse_search`, `parse_byeolpyo`,
+`plan_attachment` 는 순수 함수). 실제 API 응답이 픽스처와 다르면 그 JSON 을
+`test_fetch.py` 에 추가하고 파서를 고치면 된다 — 어디가 깨졌는지가 바로 드러난다.
 
 ## 세 개의 연산
 
@@ -70,8 +76,16 @@ GB법령에 통째로 넘겼고, 특별법에는 조례 계층 자체가 없다.
 ## 사용
 
 ```bash
-# 회귀 테스트 18건 — lawkit/ 안에서 실행한다
-cd lawkit && node --test
+# 검토 1건 — 자곡동 271-4
+node lawkit/check.js --대지면적 331 --용도지역 자연녹지지역 --시도 서울특별시 \
+                     --구역 개발제한구역,취락지구 --용도 근린생활시설 --자격 지정당시거주자
+
+# --용도 를 빼면 트랙별 분기표가 나온다 (이 대지는 용도 없이 확정되지 않는다)
+```
+
+```bash
+# 테스트 — 리졸버 22건 + 파서 20건
+cd lawkit && node --test && python3 -m unittest test_fetch
 
 # 저장소 루트에서 돌릴 때는 파일을 명시해야 한다
 #   node --test lawkit/          ← 디렉터리를 모듈로 해석해 실패한다
