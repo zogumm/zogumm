@@ -70,9 +70,15 @@ GB법령에 통째로 넘겼고, 특별법에는 조례 계층 자체가 없다.
 ## 사용
 
 ```bash
-node --test                             # 회귀 테스트 18건
-python3 fetch.py fetch --oc <아이디>    # 법령 본문 + 별표 전체 수집
-python3 fetch.py check --oc <아이디>    # 개정된 법령만 보고
+# 회귀 테스트 18건 — lawkit/ 안에서 실행한다
+cd lawkit && node --test
+
+# 저장소 루트에서 돌릴 때는 파일을 명시해야 한다
+#   node --test lawkit/          ← 디렉터리를 모듈로 해석해 실패한다
+node --test lawkit/*.test.js
+
+python3 lawkit/fetch.py fetch --oc <아이디>    # 법령 본문 + 별표 전체 수집
+python3 lawkit/fetch.py check --oc <아이디>    # 개정된 법령만 보고
 ```
 
 ```js
