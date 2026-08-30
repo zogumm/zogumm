@@ -213,6 +213,64 @@ test('회귀 — 지하층 미확정 사실이 결과에 실려 나간다', () =
   assert.equal(지하.확실성, '미확정');
 });
 
+/* ---------------- 접도: 규모 이전의 게이트 ---------------- */
+
+test('접도 2m 미만이면 규모가 얼마든 보류된다 — 맹지', () => {
+  const r = resolve(
+    { ...대지, 용도: '근린생활시설', 자격: '지정당시거주자', 도로: { 접도길이: 0 } },
+    { rules },
+  );
+
+  assert.equal(r.status, STATUS.NEEDS_REVIEW);
+  assert.equal(r.접도.통과, false);
+  assert.match(r.메시지, /2m 미만/);
+  // 규모는 계산되지만 그것만 보고 지을 수 있다고 오해하면 안 된다
+  assert.match(r.경고.join(' '), /접도 요건과 무관하게 계산된 값/);
+});
+
+test('접도 미입력이면 확정하되 경고를 단다', () => {
+  const r = resolve({ ...대지, 용도: '근린생활시설', 자격: '지정당시거주자' }, { rules });
+
+  assert.equal(r.status, STATUS.OK);
+  assert.equal(r.접도.통과, null);
+  assert.match(r.경고.join(' '), /접도 요건 미확인/);
+});
+
+test('접도 2m 이상이면 통과하고 경고가 없다', () => {
+  const r = resolve(
+    { ...대지, 용도: '근린생활시설', 자격: '지정당시거주자', 도로: { 접도길이: 6, 너비: 8 } },
+    { rules },
+  );
+
+  assert.equal(r.status, STATUS.OK);
+  assert.equal(r.접도.통과, true);
+  assert.equal(r.경고.filter((w) => w.includes('접도')).length, 0);
+});
+
+test('연면적 2,000㎡ 이상은 너비 6m 도로에 4m 이상 접해야 한다', () => {
+  const 큰대지 = {
+    대지면적: 2000, 용도지역: '제2종일반주거지역', 구역: [], 시도: '서울특별시',
+  };
+
+  // 용적률 200% → 4,000㎡ → 강화 기준 적용
+  const 좁은도로 = resolve({ ...큰대지, 도로: { 접도길이: 3, 너비: 4 } }, { rules });
+  assert.equal(좁은도로.status, STATUS.NEEDS_REVIEW);
+  assert.match(좁은도로.메시지, /6m 도로에 4m/);
+
+  const 넓은도로 = resolve({ ...큰대지, 도로: { 접도길이: 5, 너비: 8 } }, { rules });
+  assert.equal(넓은도로.status, STATUS.OK);
+  assert.equal(넓은도로.접도.통과, true);
+});
+
+test('연면적 2,000㎡ 미만이면 2m 만 넘으면 된다', () => {
+  const r = resolve(
+    { ...대지, 용도: '근린생활시설', 자격: '지정당시거주자', 도로: { 접도길이: 2.5 } },
+    { rules },
+  );
+  assert.equal(r.status, STATUS.OK);
+  assert.equal(r.접도.통과, true);
+});
+
 /* ---------------- 확장성: 코드를 고치지 않고 지구를 추가할 수 있는가 ---------------- */
 
 /**
