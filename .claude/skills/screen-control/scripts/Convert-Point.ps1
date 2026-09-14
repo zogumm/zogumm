@@ -26,6 +26,8 @@ param(
 
 . (Join-Path $PSScriptRoot '..\lib\Bootstrap.ps1')
 
+$pointSet = $PSCmdlet.ParameterSetName   # 스크립트블록 밖에서 확정 (래퍼의 $PSCmdlet 과 혼동 방지)
+
 Invoke-ScScript {
     Initialize-ScNative | Out-Null
 
@@ -43,7 +45,7 @@ Invoke-ScScript {
     $window = Resolve-ScTargetWindow -ProcessName $ProcessName -TitleLike $TitleLike -ProcessId $ProcessId -Handle $handleValue
 
     $sx = 0; $sy = 0
-    switch ($PSCmdlet.ParameterSetName) {
+    switch ($pointSet) {
         'Window' { $sx = $window.Bounds.Left + $WindowX; $sy = $window.Bounds.Top + $WindowY }
         'Client' { $sx = $window.ClientRect.Left + $ClientX; $sy = $window.ClientRect.Top + $ClientY }
         'Screen' { $sx = $ScreenX; $sy = $ScreenY }
@@ -51,6 +53,9 @@ Invoke-ScScript {
             if (-not $meta) { throw "-ImageX/-ImageY 에는 -Evidence 가 필요합니다. [exit=$(Get-ScExitCode InvalidArguments)]" }
             $p = ConvertTo-ScScreenPointFromImage -ImageX $ImageX -ImageY $ImageY -Meta $meta
             $sx = $p.X; $sy = $p.Y
+        }
+        default {
+            throw "좌표를 지정해야 합니다 (받은 세트: '$pointSet'). [exit=$(Get-ScExitCode InvalidArguments)]"
         }
     }
 

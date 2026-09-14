@@ -96,9 +96,13 @@ Invoke-ScScript {
         $cap1 = New-ScCapture -Mode Window -Window $window -OutDir $testDir -Name '01-before' -Note 'selftest before' -Restore
         [void]$script:Artifacts.Add($cap1.ImagePath)
         if ($cap1.GridImagePath) { [void]$script:Artifacts.Add($cap1.GridImagePath) }
-        $capOk = (Test-Path -LiteralPath $cap1.ImagePath) -and ((Get-Item -LiteralPath $cap1.ImagePath).Length -gt 1000) -and `
-                 (Test-Path -LiteralPath $cap1.MetaPath) -and (Test-Path -LiteralPath $cap1.GridImagePath)
-        Add-TestResult -Step '창 캡처 + 격자 + 메타데이터' -Ok $capOk -Detail ("{0} ({1}x{2})" -f $cap1.ImagePath, $cap1.Meta.imageWidth, $cap1.Meta.imageHeight)
+        $capOk = (Test-Path -LiteralPath $cap1.ImagePath) -and ((Get-Item -LiteralPath $cap1.ImagePath).Length -gt 0) -and `
+                 (Test-Path -LiteralPath $cap1.MetaPath) -and (Test-Path -LiteralPath $cap1.GridImagePath) -and `
+                 ($cap1.Meta.window.handle -eq $window.HandleValue) -and `
+                 ($cap1.Meta.captureRect.left -eq $window.Bounds.Left) -and ($cap1.Meta.captureRect.top -eq $window.Bounds.Top) -and `
+                 ($cap1.Meta.imageWidth -gt 0) -and ($cap1.Meta.scale -gt 0)
+        Add-TestResult -Step '창 캡처 + 격자 + 메타데이터' -Ok $capOk -Detail ("{0} ({1}x{2}), 메타 창핸들={3}, 영역={4},{5}" -f `
+            $cap1.ImagePath, $cap1.Meta.imageWidth, $cap1.Meta.imageHeight, ('0x{0:X}' -f [int64]$cap1.Meta.window.handle), $cap1.Meta.captureRect.left, $cap1.Meta.captureRect.top)
         $window = $cap1.Window
 
         $cw = $window.ClientRect.Width
@@ -168,10 +172,15 @@ Invoke-ScScript {
 
         if (-not $useUia -and $clickOk) {
             # 버튼이 없는 앱이면 클릭으로 포커스를 준 뒤 타이핑해서 변화를 만든다.
-            $wshell = New-Object -ComObject WScript.Shell
-            Start-Sleep -Milliseconds 200
-            [void]$wshell.SendKeys('screen-control selftest')
-            Start-Sleep -Milliseconds 400
+            try {
+                $wshell = New-Object -ComObject WScript.Shell
+                Start-Sleep -Milliseconds 200
+                [void]$wshell.SendKeys('screen-control selftest')
+                Start-Sleep -Milliseconds 400
+            }
+            catch {
+                Write-Host "SendKeys 사용 불가(무시): $($_.Exception.Message)" -ForegroundColor DarkGray
+            }
         }
 
         $cap3 = New-ScCapture -Mode Window -Window $window -OutDir $testDir -Name '05-click-after' -Note 'click after'
@@ -206,7 +215,8 @@ Invoke-ScScript {
     # --- 결과 요약 ---------------------------------------------------------
     Write-Host ""
     Write-Host "================= 결과 요약 =================" -ForegroundColor Cyan
-    $script:Results | Select-Object @{n = '결과'; e = { if ($_.Ok) { 'PASS' } else { 'FAIL' } } }, Step, Detail | Format-Table -AutoSize -Wrap
+    $script:Results | Select-Object @{n = '결과'; e = { if ($_.Ok) { 'PASS' } else { 'FAIL' } } }, Step, Detail |
+        Write-ScTable
     $failed = @($script:Results | Where-Object { -not $_.Ok })
     Write-Host ""
     Write-Host "확인용 이미지 (Read 도구로 열어보세요):" -ForegroundColor Cyan

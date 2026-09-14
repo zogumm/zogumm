@@ -34,14 +34,19 @@ git checkout claude/windows-screen-capture-click-6m6ahx
 ## 동작 검증
 
 ```powershell
-# 1) 순수 로직 테스트 (창을 띄우지 않음, 몇 초)
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\screen-control\scripts\Test-Logic.ps1"
+$SC = "$env:USERPROFILE\.claude\skills\screen-control"
 
-# 2) 전체 사이클 테스트 (메모장이 잠깐 떴다가 닫힘)
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\screen-control\scripts\Test-ScreenControl.ps1"
+# 1) 순수 로직 테스트 (창을 띄우지 않음, 몇 초)
+powershell -ExecutionPolicy Bypass -File "$SC\scripts\Test-Logic.ps1"
+
+# 2) 통합 테스트 — 모의 Win32 백엔드 위에서 전체 흐름 검증 (실제 창/마우스 안 건드림)
+powershell -ExecutionPolicy Bypass -File "$SC\tests\Test-Integration.ps1"
+
+# 3) 실기 테스트 — 진짜 캡처 + 진짜 클릭 (메모장이 잠깐 떴다가 닫힘)
+powershell -ExecutionPolicy Bypass -File "$SC\scripts\Test-ScreenControl.ps1"
 ```
 
-2번이 확인하는 것:
+3번이 확인하는 것:
 
 | 구분 | 항목 |
 |---|---|
@@ -51,19 +56,36 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\screen
 테스트가 만든 이미지는 `D:\ai\.screen-control\selftest-<시각>\` 에 남는다
 (D 드라이브가 없으면 `%LOCALAPPDATA%\screen-control\`). Read 도구로 열어서 눈으로 확인하면 된다.
 
+### 모의(mock) 백엔드
+
+`tests/MockBackend.ps1` 은 user32/GDI 호출을 가짜 창으로 대체한다.
+`SCREEN_CONTROL_MOCK` 환경변수가 설정되어 있을 때만 로드되며, 로드되면 경고를 찍고
+**실제 클릭은 절대 발생하지 않는다.** 평상시에는 이 변수를 설정하지 않는다.
+이 덕분에 Windows·실제 창 없이도 CI나 리눅스에서 안전장치 동작을 회귀 검증할 수 있다.
+
 ## 지금까지 어디까지 검증했나
 
-이 코드는 리눅스 컨테이너에서 작성되었기 때문에 **Windows 실기 검증은 위 2번 명령으로
-사용자 PC에서 해야 한다.** 작성 환경에서 끝낸 검증은 다음과 같다.
+이 코드는 리눅스 컨테이너에서 작성되었다. 거기서 돌릴 수 있는 것은 전부 돌렸고,
+**실제 GDI 캡처와 SendInput 입력만 Windows 실기 확인(위 3번)이 남아 있다.**
 
-- PowerShell 7.4 파서로 전 파일 구문 검사 통과
-- 임베디드 C#(Win32 P/Invoke, INPUT 구조체, 이미지 diff) 컴파일 통과,
-  `INPUT` 구조체 크기 40바이트(x64 실제 값과 일치) 확인
-- `Test-Logic.ps1` 30개 항목 통과 — 좌표 변환(축소 캡처 보정, 멀티모니터 정규화),
-  위험 키워드 탐지(`clock` 같은 오탐 방지 포함), 증거 검증(오래됨/다른 창/창 이동/전체화면 거부),
-  종료 코드 매핑, 감사 로그 기록
+통과한 검사 (총 69개):
 
-검증하지 못한 부분은 실제 Windows GDI 캡처와 `SendInput` 마우스 입력 경로다. 2번 테스트가 그 부분을 덮는다.
+| 테스트 | 개수 | 내용 |
+|---|---|---|
+| 구문/컴파일 | - | 전 파일 파서 검사, 임베디드 C# 컴파일, `INPUT` 구조체 40바이트(x64 실제값과 일치) |
+| `Test-Logic.ps1` | 30 | 좌표 변환(축소 보정·멀티모니터 정규화), 위험 키워드 탐지(`clock` 오탐 방지 포함), 증거 검증(오래됨/다른 창/창 이동/전체화면), 종료 코드, 감사 로그 |
+| `Test-Integration.ps1` | 29 | 창 목록·필터, 4가지 좌표계 클릭, 축소 캡처 보정, 오른쪽/더블 클릭, 거부 시나리오 11종(전부 "클릭 이벤트 0건" 까지 확인), `-WhatIf`, 모호한 창, 감사 로그 |
+| `Test-ScreenControl.ps1` (모의 백엔드) | 10 | 캡처 → 클릭 → 재캡처 변화 감지 전체 사이클 |
+
+이 과정에서 실제로 잡은 버그 3건:
+
+1. **모든 클릭이 (0,0) 으로 계산되던 문제** — 래퍼 함수가 advanced function 이라
+   스크립트의 `$PSCmdlet` 을 가려 파라미터 세트가 `__AllParameterSets` 로 잡혔고,
+   좌표 변환 `switch` 가 통째로 건너뛰어졌다. (Windows 에서도 동일하게 깨졌을 버그)
+2. **`-WhatIf` 실행 시 출력 폴더 생성과 감사 로그 기록이 조용히 취소되던 문제** —
+   ShouldProcess 를 지원하는 cmdlet 들이 전부 건너뛰어졌다.
+3. **출력이 파이프로 리디렉션되면 표가 아무것도 출력되지 않던 문제** —
+   자동화(= Claude 가 스크립트를 실행하는 경우)에서 창 목록이 빈 것처럼 보였다.
 
 ## 폴더 구조
 
@@ -75,6 +97,9 @@ screen-control/
   lib/
     ScreenControl.psm1  코어 (Win32 P/Invoke, 캡처, 클릭, 검증, 로깅)
     Bootstrap.ps1       스크립트 공통 오류/종료코드 처리
+  tests/
+    MockBackend.ps1       모의 Win32/GDI 백엔드 (SCREEN_CONTROL_MOCK 로만 활성화)
+    Test-Integration.ps1  모의 백엔드 위에서 도는 통합 테스트 29종
   scripts/
     Get-Window.ps1        창 목록/핸들
     Capture-Screen.ps1    캡처 (+ 좌표격자 + 메타데이터)

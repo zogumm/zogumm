@@ -109,7 +109,7 @@ Invoke-ScScript {
                           @{n = 'WindowY'; e = { $_.WindowY } },
                           @{n = 'Size'; e = { "$($_.Width)x$($_.Height)" } },
                           @{n = 'Risky'; e = { if ($_.LooksRisky) { '!' } else { '' } } } |
-        Format-Table -AutoSize
+        Write-ScTable
 
     Write-Host "Risky(!) 로 표시된 요소는 클릭 전에 반드시 사용자 승인을 받으세요." -ForegroundColor Yellow
     Write-Host "좌표는 그대로 Invoke-Click.ps1 -WindowX <WindowX> -WindowY <WindowY> 에 사용할 수 있습니다 (창이 움직이지 않았다면)." -ForegroundColor DarkGray

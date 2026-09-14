@@ -60,6 +60,7 @@ $SC = "$env:USERPROFILE\.claude\skills\screen-control\scripts"
 | `Find-UIElement.ps1` | (선택) UI Automation 으로 버튼/메뉴 좌표 자동 탐색 |
 | `Test-ScreenControl.ps1` | 전체 사이클 + 안전장치 자동 검증 |
 | `Test-Logic.ps1` | 좌표/키워드/증거 검증 로직 단위 테스트 (Windows 아니어도 실행 가능) |
+| `../tests/Test-Integration.ps1` | 모의 Win32 백엔드로 전체 흐름 검증 (실제 창/마우스를 건드리지 않음) |
 
 산출물 기본 폴더: `D:\ai\.screen-control` (없으면 `%LOCALAPPDATA%\screen-control`).
 `SCREEN_CONTROL_OUT` 환경변수나 `-OutDir` 로 바꿀 수 있다. 모든 캡처/클릭은

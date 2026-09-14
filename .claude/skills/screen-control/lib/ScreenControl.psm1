@@ -464,7 +464,8 @@ function Resolve-ScOutDir {
         else { $OutDir = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'screen-control' }
     }
     if (-not (Test-Path -LiteralPath $OutDir)) {
-        New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
+        # -WhatIf 실행 중에도 폴더는 실제로 만들어야 한다 (안 그러면 경로 확인이 실패한다)
+        New-Item -ItemType Directory -Path $OutDir -Force -WhatIf:$false -Confirm:$false | Out-Null
     }
     return (Resolve-Path -LiteralPath $OutDir).Path
 }
@@ -486,7 +487,7 @@ function Write-ScLog {
         }
         foreach ($k in $Data.Keys) { $entry[$k] = $Data[$k] }
         $line = ($entry | ConvertTo-Json -Depth 8 -Compress)
-        Add-Content -LiteralPath (Join-Path $dir 'screen-control.log.jsonl') -Value $line -Encoding UTF8
+        Add-Content -LiteralPath (Join-Path $dir 'screen-control.log.jsonl') -Value $line -Encoding UTF8 -WhatIf:$false -Confirm:$false
     }
     catch {
         Write-Warning "감사 로그 기록 실패: $($_.Exception.Message)"
@@ -578,7 +579,7 @@ function Get-ScDangerMatch {
     }
     return [pscustomobject]@{
         IsDangerous = ($hits.Count -gt 0)
-        Matches     = @($hits)
+        Matches     = $hits.ToArray()
     }
 }
 
@@ -683,7 +684,10 @@ function Get-ScWindow {
     }
 
     $results = New-Object System.Collections.Generic.List[object]
-    foreach ($h in [ScreenControl.Native]::ListTopLevel()) {
+    # 메서드 호출 결과를 foreach 에 바로 넣으면 PowerShell 바인더가 IntPtr[] 열거에서
+    # "Argument types do not match" 로 실패하는 경우가 있어 변수로 받아서 순회한다.
+    $handles = @([ScreenControl.Native]::ListTopLevel())
+    foreach ($h in $handles) {
         if (-not $IncludeInvisible) {
             if (-not [ScreenControl.Native]::IsWindowVisible($h)) { continue }
             if ([string]::IsNullOrWhiteSpace([ScreenControl.Native]::GetTitle($h))) { continue }
@@ -706,7 +710,8 @@ function Get-ScWindow {
         }
         [void]$results.Add($info)
     }
-    return @($results)
+    # @(List[object]) 는 일부 PowerShell 런타임에서 바인더 오류를 낸다. ToArray() 가 안전하다.
+    return $results.ToArray()
 }
 
 function Resolve-ScTargetWindow {
@@ -915,6 +920,77 @@ function Add-ScMarker {
     return $OutPath
 }
 
+function Save-ScCaptureImage {
+    <#
+    .SYNOPSIS
+        화면/창의 실제 픽셀을 읽어 PNG 로 저장하고 최종 크기와 축소 배율을 돌려준다.
+    .DESCRIPTION
+        GDI 에 의존하는 유일한 지점이라 테스트에서는 이 함수만 대체하면
+        New-ScCapture 의 나머지 로직(활성화, 영역 계산, 메타데이터)을 그대로 검증할 수 있다.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][ValidateSet('Screen', 'PrintWindow')][string]$Method,
+        [Parameter(Mandatory)]$CaptureRect,
+        [int64]$WindowHandle = 0,
+        [Parameter(Mandatory)][string]$OutFile,
+        [int]$MaxWidth = 1600
+    )
+
+    Initialize-ScNative | Out-Null
+
+    $bmp = New-Object System.Drawing.Bitmap($CaptureRect.Width, $CaptureRect.Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    try {
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        try {
+            if ($Method -eq 'PrintWindow') {
+                $g.Clear([System.Drawing.Color]::Black)
+                $hdc = $g.GetHdc()
+                try {
+                    # PW_RENDERFULLCONTENT(0x2): 최신(DWM) 창도 내용까지 렌더링
+                    $ok = [ScreenControl.Native]::PrintWindowTo([IntPtr]$WindowHandle, $hdc, 2)
+                }
+                finally { $g.ReleaseHdc($hdc) }
+                if (-not $ok) { Write-Warning "PrintWindow 가 실패를 보고했습니다. 이미지가 비어 있을 수 있습니다." }
+            }
+            else {
+                $g.CopyFromScreen($CaptureRect.Left, $CaptureRect.Top, 0, 0,
+                    (New-Object System.Drawing.Size($CaptureRect.Width, $CaptureRect.Height)),
+                    [System.Drawing.CopyPixelOperation]::SourceCopy)
+            }
+        }
+        finally { $g.Dispose() }
+
+        $scale = 1.0
+        $finalBmp = $bmp
+        if ($MaxWidth -gt 0 -and $bmp.Width -gt $MaxWidth) {
+            $scale = [double]$MaxWidth / [double]$bmp.Width
+            $newW = [int][Math]::Round($bmp.Width * $scale)
+            $newH = [int][Math]::Round($bmp.Height * $scale)
+            $resized = New-Object System.Drawing.Bitmap($newW, $newH)
+            $rg = [System.Drawing.Graphics]::FromImage($resized)
+            try {
+                $rg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $rg.DrawImage($bmp, 0, 0, $newW, $newH)
+            }
+            finally { $rg.Dispose() }
+            $finalBmp = $resized
+            $scale = [double]$newW / [double]$CaptureRect.Width
+        }
+
+        try {
+            $finalBmp.Save($OutFile, [System.Drawing.Imaging.ImageFormat]::Png)
+            return [pscustomobject]@{ Width = $finalBmp.Width; Height = $finalBmp.Height; Scale = $scale }
+        }
+        finally {
+            if (-not [object]::ReferenceEquals($finalBmp, $bmp)) { $finalBmp.Dispose() }
+        }
+    }
+    finally {
+        $bmp.Dispose()
+    }
+}
+
 function New-ScCapture {
     <#
     .SYNOPSIS
@@ -997,57 +1073,11 @@ function New-ScCapture {
         Start-Sleep -Milliseconds $SettleMs
     }
 
-    $bmp = New-Object System.Drawing.Bitmap($captureRect.Width, $captureRect.Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    try {
-        $g = [System.Drawing.Graphics]::FromImage($bmp)
-        try {
-            if ($Method -eq 'PrintWindow') {
-                $g.Clear([System.Drawing.Color]::Black)
-                $hdc = $g.GetHdc()
-                try {
-                    # PW_RENDERFULLCONTENT(0x2): 최신(DWM) 창도 내용까지 렌더링
-                    $ok = [ScreenControl.Native]::PrintWindowTo([IntPtr]$target.HandleValue, $hdc, 2)
-                }
-                finally { $g.ReleaseHdc($hdc) }
-                if (-not $ok) { Write-Warning "PrintWindow 가 실패를 보고했습니다. 이미지가 비어 있을 수 있습니다." }
-            }
-            else {
-                $g.CopyFromScreen($captureRect.Left, $captureRect.Top, 0, 0,
-                    (New-Object System.Drawing.Size($captureRect.Width, $captureRect.Height)),
-                    [System.Drawing.CopyPixelOperation]::SourceCopy)
-            }
-        }
-        finally { $g.Dispose() }
-
-        $scale = 1.0
-        $finalBmp = $bmp
-        if ($MaxWidth -gt 0 -and $bmp.Width -gt $MaxWidth) {
-            $scale = [double]$MaxWidth / [double]$bmp.Width
-            $newW = [int][Math]::Round($bmp.Width * $scale)
-            $newH = [int][Math]::Round($bmp.Height * $scale)
-            $resized = New-Object System.Drawing.Bitmap($newW, $newH)
-            $rg = [System.Drawing.Graphics]::FromImage($resized)
-            try {
-                $rg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-                $rg.DrawImage($bmp, 0, 0, $newW, $newH)
-            }
-            finally { $rg.Dispose() }
-            $finalBmp = $resized
-            $scale = [double]$newW / [double]$captureRect.Width
-        }
-
-        try {
-            $finalBmp.Save($imagePath, [System.Drawing.Imaging.ImageFormat]::Png)
-            $imgW = $finalBmp.Width
-            $imgH = $finalBmp.Height
-        }
-        finally {
-            if (-not [object]::ReferenceEquals($finalBmp, $bmp)) { $finalBmp.Dispose() }
-        }
-    }
-    finally {
-        $bmp.Dispose()
-    }
+    $saved = Save-ScCaptureImage -Method $Method -CaptureRect $captureRect `
+        -WindowHandle $(if ($target) { $target.HandleValue } else { 0 }) -OutFile $imagePath -MaxWidth $MaxWidth
+    $imgW = $saved.Width
+    $imgH = $saved.Height
+    $scale = $saved.Scale
 
     $gridPath = $null
     if (-not $NoGrid) {
@@ -1092,7 +1122,7 @@ function New-ScCapture {
         }
     }
 
-    ($meta | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $metaPath -Encoding UTF8
+    ($meta | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $metaPath -Encoding UTF8 -WhatIf:$false -Confirm:$false
 
     Write-ScLog -Action 'capture' -OutDir $dir -Data @{
         mode      = $Mode
@@ -1206,7 +1236,7 @@ function Test-ScEvidence {
 
     return [pscustomobject]@{
         Ok         = ($reasons.Count -eq 0)
-        Reasons    = @($reasons)
+        Reasons    = $reasons.ToArray()
         AgeSeconds = $age
     }
 }

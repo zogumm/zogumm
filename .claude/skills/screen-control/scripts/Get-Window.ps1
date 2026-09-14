@@ -41,7 +41,7 @@ Invoke-ScScript {
                       @{n = 'DPI'; e = { $_.Dpi } },
                       @{n = 'FG'; e = { if ($_.Foreground) { '*' } else { '' } } },
                       @{n = 'Title'; e = { if ($_.Title.Length -gt 60) { $_.Title.Substring(0, 57) + '...' } else { $_.Title } } } |
-        Format-Table -AutoSize
+        Write-ScTable
 
     Write-Host "총 $($windows.Count) 개. 이후 명령에는 -Handle <핸들> 로 고정해서 쓰는 것이 가장 안전합니다." -ForegroundColor DarkGray
 }

@@ -36,11 +36,13 @@ param(
 
 . (Join-Path $PSScriptRoot '..\lib\Bootstrap.ps1')
 
+$captureSet = $PSCmdlet.ParameterSetName   # 스크립트블록 밖에서 확정 (래퍼의 $PSCmdlet 과 혼동 방지)
+
 Invoke-ScScript {
     Initialize-ScNative | Out-Null
 
     $result = $null
-    if ($PSCmdlet.ParameterSetName -eq 'Screen') {
+    if ($captureSet -eq 'Screen') {
         $result = New-ScCapture -Mode Screen -OutDir $OutDir -Name $Name -NoGrid:$NoGrid -GridStep $GridStep `
             -MaxWidth $MaxWidth -SettleMs $SettleMs -Note $Note
     }

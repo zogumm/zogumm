@@ -60,6 +60,11 @@ param(
 
 . (Join-Path $PSScriptRoot '..\lib\Bootstrap.ps1')
 
+# 스크립트 스코프에서 확정해 둔다. 스크립트블록 안에서 $PSCmdlet 을 참조하면
+# 래퍼 함수의 것이 잡힐 수 있어 좌표 변환이 통째로 건너뛰어진다.
+$coordinateSet = $PSCmdlet.ParameterSetName
+$whatIfRequested = [bool]$WhatIfPreference
+
 Invoke-ScScript {
     Initialize-ScNative | Out-Null
 
@@ -83,7 +88,7 @@ Invoke-ScScript {
     # --- 좌표 변환 --------------------------------------------------------
     $targetX = 0
     $targetY = 0
-    switch ($PSCmdlet.ParameterSetName) {
+    switch ($coordinateSet) {
         'Window' {
             if ((Get-ScProp $meta 'labelSpace') -ne 'window') {
                 throw "이 캡처는 창 기준 좌표계가 아닙니다(labelSpace=$(Get-ScProp $meta 'labelSpace')). -ScreenX/-ScreenY 를 사용하세요. [exit=$(Get-ScExitCode InvalidArguments)]"
@@ -106,6 +111,9 @@ Invoke-ScScript {
             $targetX = $p.X
             $targetY = $p.Y
         }
+        default {
+            throw "좌표를 지정해야 합니다: -WindowX/-WindowY, -ClientX/-ClientY, -ScreenX/-ScreenY, -ImageX/-ImageY 중 하나 (받은 세트: '$coordinateSet'). [exit=$(Get-ScExitCode InvalidArguments)]"
+        }
     }
 
     $result = Invoke-ScClick -Window $window -ScreenX $targetX -ScreenY $targetY -Intent $Intent `
@@ -113,7 +121,7 @@ Invoke-ScScript {
         -Button $Button -DoubleClick:$Double -MoveDelayMs $MoveDelayMs -PressDelayMs $PressDelayMs -SettleMs $SettleMs `
         -AllowOutsideWindow:$AllowOutsideWindow -UserApproved:$UserApproved -Risk $Risk `
         -RestoreCursor:$RestoreCursor -UseAbsoluteMove:$UseAbsoluteMove -OutDir $OutDir `
-        -WhatIf:($WhatIfPreference)
+        -WhatIf:$whatIfRequested
 
     $after = $null
     $diff = $null
