@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows PC 에 Claude Code(CLI) 와 screen-control 스킬을 설치하고, 설치가 제대로 됐는지 검증한다.
 
@@ -42,7 +42,7 @@ function Write-Ok { param([string]$Text) Write-Host "  [OK]   $Text" -Foreground
 function Write-Warn2 { param([string]$Text) Write-Host "  [주의] $Text" -ForegroundColor Yellow }
 function Write-Bad { param([string]$Text) Write-Host "  [실패] $Text" -ForegroundColor Red }
 function Add-Step { param([string]$Name, [string]$State, [string]$Detail = '')
-    [void]$script:Steps.Add([pscustomobject]@{ 단계 = $Name; 결과 = $State; 비고 = $Detail })
+    [void]$script:Steps.Add([pscustomobject]@{ Step = $Name; Result = $State; Note = $Detail })
 }
 function Test-Command { param([string]$Name)
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
@@ -238,10 +238,13 @@ else {
 # ---------------------------------------------------------------------------
 Write-Host ""
 Write-Host "================ 설치 요약 ================" -ForegroundColor White
-Write-Host (($script:Steps | Format-Table -AutoSize | Out-String -Width 200).TrimEnd())
+Write-Host ((
+    $script:Steps | Select-Object @{ n = '단계'; e = { $_.Step } }, @{ n = '결과'; e = { $_.Result } }, @{ n = '비고'; e = { $_.Note } } |
+        Format-Table -AutoSize | Out-String -Width 200
+).TrimEnd())
 Write-Host ""
 
-$failed = @($script:Steps | Where-Object { $_.결과 -eq '실패' })
+$failed = @($script:Steps | Where-Object { $_.Result -eq '실패' })
 if ($failed.Count -gt 0) {
     Write-Host "$($failed.Count) 개 단계가 실패했습니다. 위 메시지를 Claude 에게 그대로 붙여넣으면 됩니다." -ForegroundColor Yellow
 }

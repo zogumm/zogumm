@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     이 폴더를 Claude Code 스킬 위치(~\.claude\skills\screen-control)에 설치한다.
 .EXAMPLE

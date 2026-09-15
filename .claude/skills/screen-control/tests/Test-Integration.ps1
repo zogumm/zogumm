@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows 없이 전체 흐름을 검증하는 통합 테스트 (모의 Win32 백엔드 사용).
 
@@ -92,6 +92,7 @@ function Invoke-Cli {
 function ConvertFrom-CliJson {
     # 경고 줄이 섞여 들어와도 JSON 본문만 잘라서 해석한다.
     param([string]$Text)
+    $Text = $Text.TrimStart([char]0xFEFF)
     $start = $Text.IndexOf('{')
     $end = $Text.LastIndexOf('}')
     if ($start -lt 0 -or $end -le $start) { return $null }
@@ -125,7 +126,7 @@ Test-Case '제목 필터가 동작한다' (($r.Code -eq 0) -and ($r.Output -matc
 $r = Invoke-Cli 'Capture-Screen.ps1' @('-Handle', '0x3E9', '-Name', 't1', '-OutDir', $work)
 $meta = $null
 if (Test-Path -LiteralPath (Join-Path $work 't1.json')) {
-    $meta = Get-Content -LiteralPath (Join-Path $work 't1.json') -Raw | ConvertFrom-Json
+    $meta = (Get-Content -LiteralPath (Join-Path $work 't1.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
 }
 Test-Case '창 캡처가 png/grid/json 을 만든다' (
     ($r.Code -eq 0) -and (Test-Path (Join-Path $work 't1.png')) -and (Test-Path (Join-Path $work 't1.grid.png')) -and ($null -ne $meta) -and
@@ -165,7 +166,7 @@ Test-Case '클라이언트 좌표 클릭' (($r.Code -eq 0) -and (@(Get-ClickEven
 # 5. 축소 캡처에서의 이미지 좌표 보정
 # =====================================================================
 $r = Invoke-Cli 'Capture-Screen.ps1' @('-Handle', '0x3E9', '-Name', 'small', '-MaxWidth', '400', '-OutDir', $work)
-$smallMeta = Get-Content -LiteralPath (Join-Path $work 'small.json') -Raw | ConvertFrom-Json
+$smallMeta = (Get-Content -LiteralPath (Join-Path $work 'small.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
 Clear-Events
 $r = Invoke-Cli 'Invoke-Click.ps1' @('-Evidence', (Join-Path $work 'small.png'), '-Intent', '축소 이미지 좌표 클릭', '-ImageX', '100', '-ImageY', '50', '-NoAfterCapture', '-OutDir', $work)
 Test-Case '축소 캡처(scale 0.5)에서 이미지 좌표 보정' (
@@ -258,7 +259,7 @@ Test-Case '입력이 차단되면 명확히 실패한다 (exit != 0)' (($r.Code 
 Set-MockState
 $r = Invoke-Cli 'Capture-Screen.ps1' @('-Handle', '0x3E9', '-Name', 'stale', '-OutDir', $work)
 $stalePath = Join-Path $work 'stale.json'
-$staleMeta = Get-Content -LiteralPath $stalePath -Raw | ConvertFrom-Json
+$staleMeta = (Get-Content -LiteralPath $stalePath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
 $staleMeta.timestampUtc = (Get-Date).ToUniversalTime().AddHours(-1).ToString('o')
 ($staleMeta | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $stalePath -Encoding UTF8
 Clear-Events
@@ -267,7 +268,7 @@ Test-Case '거부: 오래된 캡처 (exit 5, 클릭 없음)' (($r.Code -eq 5) -a
 
 $r = Invoke-Cli 'Capture-Screen.ps1' @('-Screen', '-Name', 'full', '-OutDir', $work)
 $fullOk = ($r.Code -eq 0) -and (Test-Path (Join-Path $work 'full.png'))
-$fullMeta = Get-Content -LiteralPath (Join-Path $work 'full.json') -Raw | ConvertFrom-Json
+$fullMeta = (Get-Content -LiteralPath (Join-Path $work 'full.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
 Test-Case '전체 화면 캡처 동작 (라벨=화면 좌표)' ($fullOk -and ($fullMeta.labelSpace -eq 'screen') -and ($fullMeta.captureRect.width -eq 1920)) "exit=$($r.Code)"
 
 Clear-Events

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Windows 없이도 돌릴 수 있는 순수 로직 단위 테스트 (좌표 변환, 위험 키워드, 증거 검증).
 .EXAMPLE
@@ -98,6 +98,18 @@ else {
     try { Initialize-ScNative } catch { $threw = $true; $msg = $_.Exception.Message }
     Check '비 Windows 에서 명확히 실패' $threw $msg
 }
+
+# 8. 파일 인코딩 — Windows PowerShell 5.1 은 BOM 이 없으면 UTF-8 파일을 cp949 로 읽어
+#    한글이 깨지고, 심하면 파싱 자체가 실패한다. 전 파일에 UTF-8 BOM 이 있어야 한다.
+$skillRoot = Split-Path -Parent $PSScriptRoot
+$noBom = New-Object System.Collections.Generic.List[string]
+foreach ($f in @(Get-ChildItem -Path $skillRoot -Recurse -Include *.ps1, *.psm1)) {
+    $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+    if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+        [void]$noBom.Add($f.Name)
+    }
+}
+Check 'PowerShell 파일이 UTF-8 BOM 으로 저장됨' ($noBom.Count -eq 0) ($noBom -join ', ')
 
 Remove-Item -LiteralPath $img -Force -ErrorAction SilentlyContinue
 Write-Host ""

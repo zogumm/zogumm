@@ -1,4 +1,4 @@
-# ScreenControl 모의 백엔드. Bootstrap.ps1 이 모듈 내부 스코프에서 실행한다.
+﻿# ScreenControl 모의 백엔드. Bootstrap.ps1 이 모듈 내부 스코프에서 실행한다.
 # Win32/GDI 를 대체해 창 확정 -> 검증 -> 클릭 순서 로직을 Windows 없이 검증한다.
 
 if (-not ('ScreenControl.Native' -as [type])) {
@@ -151,7 +151,7 @@ namespace ScreenControl
 }
 
 # --- 상태 파일에서 모의 창 구성 ------------------------------------------------
-$script:MockState = Get-Content -LiteralPath $env:SCREEN_CONTROL_MOCK_STATE -Raw | ConvertFrom-Json
+$script:MockState = ((Get-Content -LiteralPath $env:SCREEN_CONTROL_MOCK_STATE -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json)
 $mockState = $script:MockState
 [ScreenControl.Native]::Windows.Clear()
 foreach ($w in $mockState.windows) {

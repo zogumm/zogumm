@@ -1,4 +1,4 @@
-# 모든 CLI 스크립트가 공통으로 dot-source 하는 부트스트랩.
+﻿# 모든 CLI 스크립트가 공통으로 dot-source 하는 부트스트랩.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 

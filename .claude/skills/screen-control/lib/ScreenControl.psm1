@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ScreenControl - Windows 화면 캡처 + 방어적 마우스 클릭 코어 라이브러리.
 
@@ -1171,7 +1171,10 @@ function Import-ScCaptureMeta {
     if (-not (Test-Path -LiteralPath $metaPath)) {
         throw "캡처 메타데이터(JSON)가 없습니다: $metaPath (Capture-Screen.ps1 로 캡처하면 함께 생성됩니다) [exit=$(Get-ScExitCode EvidenceProblem)]"
     }
-    return (Get-Content -LiteralPath $metaPath -Raw -Encoding UTF8 | ConvertFrom-Json)
+    $metaText = Get-Content -LiteralPath $metaPath -Raw -Encoding UTF8
+    # Windows PowerShell 5.1 이 쓴 파일에는 BOM 이 붙어 있어 ConvertFrom-Json 이 실패할 수 있다
+    $metaText = $metaText.TrimStart([char]0xFEFF)
+    return ($metaText | ConvertFrom-Json)
 }
 
 function Test-ScEvidence {
