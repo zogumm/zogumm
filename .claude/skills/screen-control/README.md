@@ -7,6 +7,19 @@ PowerShell + `Add-Type`(Win32 API / System.Drawing) 만 쓰므로 **추가 설�
 
 ## 설치 (Windows PC)
 
+### 방법 0 — 한 줄 설치 (권장)
+
+Claude Code CLI + 스킬 설치 + 검증까지 한 번에 한다. 관리자 권한 불필요.
+
+```powershell
+$u='https://raw.githubusercontent.com/zogumm/zogumm/claude/windows-screen-capture-click-6m6ahx/install-screen-control.ps1'
+$f="$env:TEMP\install-screen-control.ps1"; Invoke-WebRequest $u -OutFile $f -UseBasicParsing
+powershell -ExecutionPolicy Bypass -File $f
+```
+
+(내용을 먼저 읽어보고 싶으면 `notepad $f` 로 열어본 뒤 마지막 줄을 실행하면 된다.
+이미 Claude Code 가 깔려 있으면 `-SkipClaudeCode`, 메모장 실기 테스트를 원치 않으면 `-SkipRealTest` 를 붙인다.)
+
 ### 방법 A — 이 브랜치를 zip 으로 받아서 설치
 
 ```powershell
