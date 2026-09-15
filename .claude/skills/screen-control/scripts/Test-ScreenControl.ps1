@@ -44,8 +44,15 @@ Invoke-ScScript {
 
     function Invoke-ClickCli {
         param([string[]]$CliArgs)
-        $out = & $hostExe -NoProfile -ExecutionPolicy Bypass -File $clickScript @CliArgs 2>&1
-        return [pscustomobject]@{ Code = $LASTEXITCODE; Output = ($out | Out-String) }
+        # 5.1 에서는 자식의 stderr 출력이 NativeCommandError 로 승격되므로 잠시 낮춘다.
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $out = & $hostExe -NoProfile -ExecutionPolicy Bypass -File $clickScript @CliArgs 2>&1
+            $code = $LASTEXITCODE
+        }
+        finally { $ErrorActionPreference = $prevEap }
+        return [pscustomobject]@{ Code = $code; Output = ($out | Out-String) }
     }
 
     # --- 0) 초기화 ---------------------------------------------------------

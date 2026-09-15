@@ -47,6 +47,23 @@ function Add-Step { param([string]$Name, [string]$State, [string]$Detail = '')
 function Test-Command { param([string]$Name)
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
+function Invoke-Native {
+    <#
+        외부 명령을 실행하고 출력/종료코드를 돌려준다.
+        Windows PowerShell 5.1 은 $ErrorActionPreference='Stop' 상태에서 자식 프로세스가
+        stderr 에 뭔가 쓰기만 해도 NativeCommandError 를 던지기 때문에(npm 경고, 테스트의
+        거부 메시지 등) 실행하는 동안만 Continue 로 낮춘다.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Exe, [string[]]$Arguments = @())
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = & $Exe @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $prevEap }
+    return [pscustomobject]@{ Code = $code; Output = (($out | Out-String).Trim()) }
+}
 
 if (-not $Destination) {
     $home_ = if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
@@ -86,7 +103,7 @@ if ($SkipNode) {
     Add-Step 'Node.js' '건너뜀'
 }
 elseif (Test-Command 'node') {
-    $nodeVersion = (& node -v) 2>$null
+    $nodeVersion = (Invoke-Native 'node' @('-v')).Output
     Write-Ok "이미 설치됨: $nodeVersion"
     $nodeOk = $true
     Add-Step 'Node.js' '이미 있음' $nodeVersion
@@ -96,7 +113,8 @@ else {
     if (Test-Command 'winget') {
         Write-Host "  winget 으로 설치를 시도합니다 (UAC 창이 뜰 수 있습니다)..."
         try {
-            & winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+            $wr = Invoke-Native 'winget' @('install', '-e', '--id', 'OpenJS.NodeJS.LTS', '--accept-source-agreements', '--accept-package-agreements')
+            if ($wr.Code -ne 0) { throw "winget 이 $($wr.Code) 코드로 종료했습니다." }
             Write-Ok "Node.js 설치 명령 완료 — PATH 반영을 위해 터미널을 새로 열어야 할 수 있습니다."
             Add-Step 'Node.js' '설치함' 'winget'
         }
@@ -120,16 +138,17 @@ if ($SkipClaudeCode) {
     Add-Step 'Claude Code' '건너뜀'
 }
 elseif (Test-Command 'claude') {
-    $claudeVersion = ''
-    try { $claudeVersion = (& claude --version) 2>$null } catch { $claudeVersion = '(버전 확인 실패)' }
+    $claudeVersion = (Invoke-Native 'claude' @('--version')).Output
+    if (-not $claudeVersion) { $claudeVersion = '(버전 확인 실패)' }
     Write-Ok "이미 설치됨: $claudeVersion"
     Add-Step 'Claude Code' '이미 있음' "$claudeVersion"
 }
 elseif (Test-Command 'npm') {
     Write-Host "  npm install -g @anthropic-ai/claude-code 실행 중... (몇 분 걸릴 수 있습니다)"
     try {
-        & npm install -g @anthropic-ai/claude-code
-        if ($LASTEXITCODE -ne 0) { throw "npm 이 $LASTEXITCODE 코드로 종료" }
+        $nr = Invoke-Native 'npm' @('install', '-g', '@anthropic-ai/claude-code')
+        if ($nr.Output) { Write-Host ($nr.Output) -ForegroundColor DarkGray }
+        if ($nr.Code -ne 0) { throw "npm 이 $($nr.Code) 코드로 종료" }
         Write-Ok "설치 완료. 새 터미널에서 'claude' 명령을 쓸 수 있습니다."
         Add-Step 'Claude Code' '설치함' 'npm -g'
     }
@@ -201,16 +220,17 @@ function Invoke-TestScript {
         return $false
     }
     Write-Host "  $Name 실행 중..."
-    $output = & $psExe -NoProfile -ExecutionPolicy Bypass -File $Path @ExtraArgs 2>&1
-    $code = $LASTEXITCODE
-    $tail = ($output | Select-Object -Last 3 | Out-String).Trim()
+    $result = Invoke-Native $psExe (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Path) + $ExtraArgs)
+    $output = $result.Output
+    $code = $result.Code
+    $tail = (($output -split "`r?`n") | Select-Object -Last 3 | Out-String).Trim()
     if ($code -eq 0) {
         Write-Ok "$Name 통과"
         Add-Step $Name '통과' ($tail -split "`n" | Select-Object -Last 1)
         return $true
     }
     Write-Bad "$Name 실패 (exit=$code)"
-    Write-Host ($output | Out-String)
+    Write-Host (($output -split "`r?`n" | Select-Object -Last 30 | Out-String).TrimEnd())
     Add-Step $Name '실패' "exit=$code"
     return $false
 }

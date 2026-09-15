@@ -85,8 +85,17 @@ function Get-ClickEvents {
 
 function Invoke-Cli {
     param([string]$Script, [string[]]$CliArgs)
-    $out = & $hostExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptsDir $Script) @CliArgs 2>&1
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Output = ($out | Out-String) }
+    # Windows PowerShell 5.1 은 $ErrorActionPreference='Stop' 일 때 자식 프로세스가
+    # stderr 에 뭔가 쓰기만 해도 NativeCommandError 를 던진다. 거부 시나리오는 stderr 로
+    # 이유를 출력하는 것이 정상이므로, 출력을 받는 동안만 Continue 로 낮춘다.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = & $hostExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $scriptsDir $Script) @CliArgs 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally { $ErrorActionPreference = $prevEap }
+    return [pscustomobject]@{ Code = $code; Output = ($out | Out-String) }
 }
 
 function ConvertFrom-CliJson {
