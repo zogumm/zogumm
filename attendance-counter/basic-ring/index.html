@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>허니유 출석부</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --cream: #faf5ea;
+      --paper: #fffdf7;
+      --ink: #17140f;
+      --ink-soft: #6f6556;
+      --line: #ebe1cf;
+      --seat: #ebe2d1;
+      --honey: #feda2e;
+      --amber: #f29a00;
+      --amber-ink: #b45f00;
+      --amber-bg: #fff3d6;
+      --away: #d6453d;
+      --away-bg: #fdecea;
+      --font-display: "Jua", "Noto Sans KR", system-ui, sans-serif;
+      --font-num: "Bagel Fat One", "Jua", system-ui, sans-serif;
+      --font-body: "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100dvh;
+      background: var(--cream); color: var(--ink);
+      font-family: var(--font-body);
+      display: flex; flex-direction: column;
+      padding-top: env(safe-area-inset-top, 0px);
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; color: inherit; }
+    button:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+
+    .screen { flex: 1; padding: 22px 20px 0; display: flex; flex-direction: column; gap: 18px; }
+
+    /* 헤더 */
+    .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .brand { font: 400 22px/1 var(--font-display); }
+    .teacher {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 5px 14px 5px 5px; border-radius: 999px; background: var(--paper);
+      box-shadow: 0 2px 10px rgba(80, 60, 20, .08);
+      font-size: 14px; font-weight: 700; white-space: nowrap;
+    }
+    .teacher img { width: 30px; height: 30px; border-radius: 50%; }
+    .session {
+      align-self: flex-start; border: 0; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 9px 14px 9px 16px; border-radius: 999px;
+      background: var(--ink); color: var(--paper); font-size: 14px; font-weight: 700;
+    }
+
+    /* 출석 현황: 링 + 요약 */
+    .stats { display: flex; flex-direction: column; gap: 14px; }
+    .summary { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; align-items: center; }
+    .ring { position: relative; width: 150px; height: 150px; }
+    .ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring .arc { transition: stroke-dashoffset .5s ease; }
+    .ring .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+    .ring .center b { font: 400 50px/.9 var(--font-num); color: var(--amber); font-variant-numeric: tabular-nums; }
+    .ring .center small { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+    .side { display: grid; gap: 8px; }
+    .side h2 { margin: 0; font: 400 26px/1.15 var(--font-display); }
+    .stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; border-radius: 12px;
+      font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    .stat-row strong { font-size: 18px; }
+    .stat-row.in { background: var(--amber-bg); color: var(--amber-ink); }
+    .stat-row.out { background: var(--away-bg); color: var(--away); }
+
+    .list-btn {
+      width: 100%; border: 1px solid var(--line); cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      min-height: 54px; padding: 0 16px 0 18px; border-radius: 16px;
+      background: var(--paper); font-size: 16px; font-weight: 700; text-align: left;
+    }
+    .list-btn em { font-style: normal; color: var(--away); font-variant-numeric: tabular-nums; }
+    .list-btn svg { flex: none; color: var(--ink-soft); }
+
+    /* 마스코트 + 출석 시작 */
+    .hero { position: relative; margin-top: auto; height: 270px; display: flex; justify-content: center; }
+    .hero .dome { position: absolute; inset: 0 -40px; background: var(--honey); border-radius: 50% 50% 0 0 / 120px 120px 0 0; }
+    .hero .mascot { position: relative; width: 230px; max-width: 70%; height: fit-content; margin-top: 22px; }
+    .start {
+      position: absolute; left: 20px; right: 20px; bottom: 20px;
+      border: 0; cursor: pointer; min-height: 62px; border-radius: 999px;
+      background: var(--ink); color: var(--paper);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      font: 400 24px/1 var(--font-display);
+      box-shadow: 0 8px 20px rgba(23, 20, 15, .25);
+    }
+
+    /* 하단 탭 */
+    .tabbar { padding: 12px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+    .tabbar div { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 999px; background: var(--honey); }
+    .tabbar button { border: 0; cursor: pointer; background: none; padding: 13px 0; border-radius: 999px; font: 400 18px/1 var(--font-display); color: #6b5300; }
+    .tabbar button[aria-current="page"] { background: var(--paper); color: var(--ink); }
+
+    @media (prefers-reduced-motion: reduce) { .ring .arc { transition: none; } }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <div class="head">
+      <span class="brand">허니유 출석부</span>
+      <span class="teacher"><img src="avatar.png" alt="">조금연 선생님</span>
+    </div>
+
+    <button class="session" type="button">10/8 시험 · 1주차
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4h8L6 9z" fill="currentColor"/></svg>
+    </button>
+
+    <section class="stats" id="stats">
+      <div class="summary">
+        <div class="ring" aria-hidden="true">
+          <svg viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="50" fill="none" stroke="var(--seat)" stroke-width="14"/>
+            <circle class="arc" id="ring-arc" cx="60" cy="60" r="50" fill="none" stroke="var(--amber)" stroke-width="14"
+                    stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+          </svg>
+          <div class="center"><b data-k="in">0</b><small>/ <span data-k="total">0</span>명</small></div>
+        </div>
+        <div class="side">
+          <h2><span data-k="in">0</span>명 왔어요</h2>
+          <div class="stat-row in">왔어요 <strong data-k="in">0</strong></div>
+          <div class="stat-row out">아직 <strong data-k="out">0</strong></div>
+        </div>
+      </div>
+
+      <button class="list-btn" type="button" id="list-btn">
+        <span>안 온 <em data-k="out">0</em>명 명단 보기</span>
+        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </section>
+
+    <div class="hero">
+      <div class="dome"></div>
+      <img class="mascot" src="mascot.png" alt="허니유 마스코트">
+      <button class="start" type="button" id="start-btn">
+        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.2-1.8c.3-.4.7-.7 1.2-.7h3c.5 0 .9.3 1.2.7L15.9 6h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        출석 시작
+      </button>
+    </div>
+  </main>
+
+  <nav class="tabbar">
+    <div>
+      <button type="button" aria-current="page">출석 인식</button>
+      <button type="button">허니유 출석</button>
+    </div>
+  </nav>
+
+  <script>
+    // 출석 인원이 바뀔 때마다 이 함수만 부르면 된다.
+    function setAttendance(arrived, total) {
+      const out = Math.max(total - arrived, 0);
+      const frac = total ? arrived / total : 0;
+      const vals = { in: arrived, out, total };
+
+      document.querySelectorAll("#stats [data-k]").forEach(el => {
+        el.textContent = vals[el.dataset.k];
+      });
+
+      const arc = document.getElementById("ring-arc");
+      arc.style.strokeDashoffset = 100 * (1 - frac);
+      arc.style.visibility = arrived ? "visible" : "hidden"; // 0명일 때 둥근 끝 점이 남지 않게
+
+      document.getElementById("list-btn").hidden = out === 0;
+      document.getElementById("stats").setAttribute("aria-label", `${total}명 중 ${arrived}명 왔어요, ${out}명 아직 안 왔어요`);
+    }
+
+    setAttendance(1, 47);
+  </script>
+</body>
+</html>
