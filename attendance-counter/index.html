@@ -1,0 +1,180 @@
+<title>출석 현황 카드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+  /* Layout: 카드 한 장 — 요약 문장 → 한 사람당 점 하나(47칸 그리드) → 명단 버튼. 큰 숫자는 하나만. */
+  :root {
+    --bg: #f7f2e9;
+    --card: #fffdf8;
+    --ink: #1f1a14;
+    --ink-soft: #6f6558;
+    --line: #ebe2d3;
+    --seat: #ebe3d5;          /* 아직 안 온 자리 */
+    --here: #e2621b;          /* 온 사람 */
+    --here-ink: #b84a0e;
+    --cta: #1f1a14;
+    --cta-ink: #fffdf8;
+    --font-display: "Bagel Fat One", "Noto Sans KR", system-ui, sans-serif;
+    --font-body: "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17140f; --card: #211d17; --ink: #f4ede2; --ink-soft: #b3a796;
+      --line: #342d24; --seat: #3a3229; --here: #ff8a3d; --here-ink: #ffa264;
+      --cta: #f4ede2; --cta-ink: #17140f; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17140f; --card: #211d17; --ink: #f4ede2; --ink-soft: #b3a796;
+    --line: #342d24; --seat: #3a3229; --here: #ff8a3d; --here-ink: #ffa264;
+    --cta: #f4ede2; --cta-ink: #17140f; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--font-body);
+    padding-inline: 16px; padding-block: 32px;
+    display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; align-content: start; gap: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .card {
+    width: 100%; max-width: 420px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    padding: 24px 22px 22px;
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px;
+  }
+
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .eyebrow { font-size: 14px; font-weight: 700; color: var(--ink-soft); letter-spacing: 0.02em; }
+  .live {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 500; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .live::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--here); animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .3; } }
+
+  /* 요약: "47명 중 / 1명 왔어요" — 한 문장으로 읽힌다 */
+  .headline { display: grid; gap: 2px; }
+  .of { font-size: 17px; font-weight: 700; color: var(--ink-soft); }
+  .count { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .count b {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: clamp(64px, 20vw, 84px); line-height: .9;
+    color: var(--here); font-variant-numeric: tabular-nums;
+  }
+  .count span { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; }
+
+  /* 한 사람 = 점 하나 */
+  .seats {
+    display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px;
+    padding: 0; margin: 0; list-style: none;
+  }
+  .seats li {
+    aspect-ratio: 1; max-width: 100%; border-radius: 50%;
+    background: var(--seat);
+    transition: background-color .3s, transform .3s;
+  }
+  .seats li.in { background: var(--here); transform: scale(1.08); }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 6px 16px;
+    font-size: 14px; color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; background: var(--seat); }
+  .legend .in i { background: var(--here); }
+  .legend strong { color: var(--ink); font-weight: 700; }
+  .legend .pct { margin-left: auto; font-weight: 700; color: var(--here-ink); }
+
+  .cta {
+    appearance: none; border: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; min-height: 60px; padding: 0 20px 0 22px;
+    border-radius: 18px;
+    background: var(--cta); color: var(--cta-ink);
+    font: 700 17px/1.2 var(--font-body);
+    transition: transform .15s;
+  }
+  .cta:active { transform: scale(.98); }
+  .cta:focus-visible { outline: 3px solid var(--here); outline-offset: 3px; }
+  .cta em { font-style: normal; color: var(--here); font-variant-numeric: tabular-nums; }
+  .cta svg { flex: none; }
+
+  .demo {
+    width: 100%; max-width: 420px;
+    display: grid; align-content: start; gap: 8px; font-size: 13px; color: var(--ink-soft);
+  }
+  .demo input { width: 100%; accent-color: var(--here); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live::before { animation: none; }
+    .seats li, .cta { transition: none; }
+  }
+</style>
+
+<main class="card" aria-labelledby="summary">
+  <div class="top">
+    <span class="eyebrow">출석 현황</span>
+    <span class="live" id="time">실시간</span>
+  </div>
+
+  <div class="headline" id="summary">
+    <span class="of"><span id="total">47</span>명 중</span>
+    <div class="count"><b id="arrived">1</b><span>명 왔어요</span></div>
+  </div>
+
+  <ul class="seats" id="seats" aria-hidden="true"></ul>
+
+  <div class="legend">
+    <span class="in"><i></i>왔어요 <strong id="lg-in">1</strong></span>
+    <span><i></i>아직 <strong id="lg-out">46</strong></span>
+    <span class="pct" id="pct">2%</span>
+  </div>
+
+  <button class="cta" type="button" id="cta">
+    <span>안 온 <em id="missing">46</em>명 명단 보기</span>
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</main>
+
+<label class="demo" for="demo-range">
+  <span>예시 미리보기 · 도착 인원 <strong id="demo-val">1</strong>명</span>
+  <input type="range" id="demo-range" min="0" max="47" value="1">
+</label>
+
+<script>
+  const TOTAL = 47;
+  const $ = id => document.getElementById(id);
+  const seats = $("seats");
+  for (let i = 0; i < TOTAL; i++) seats.appendChild(document.createElement("li"));
+
+  function render(arrived) {
+    const missing = TOTAL - arrived;
+    const pct = Math.round((arrived / TOTAL) * 100);
+    $("total").textContent = TOTAL;
+    $("arrived").textContent = arrived;
+    $("lg-in").textContent = arrived;
+    $("lg-out").textContent = missing;
+    $("missing").textContent = missing;
+    $("pct").textContent = pct + "%";
+    $("demo-val").textContent = arrived;
+    $("cta").hidden = missing === 0;
+    [...seats.children].forEach((li, i) => li.classList.toggle("in", i < arrived));
+    $("summary").setAttribute("aria-label", `${TOTAL}명 중 ${arrived}명 왔어요, ${missing}명 아직 안 왔어요`);
+  }
+
+  const now = new Date();
+  $("time").textContent = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} 기준`;
+  $("demo-range").addEventListener("input", e => render(+e.target.value));
+  render(1);
+</script>
