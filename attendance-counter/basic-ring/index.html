@@ -63,7 +63,8 @@
     .summary { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; align-items: center; }
     .ring { position: relative; width: 150px; height: 150px; }
     .ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
-    .ring .arc { transition: stroke-dashoffset .5s ease; }
+    .ring .track { stroke: var(--seat); }
+    .ring .arc { stroke: var(--amber); transition: stroke-dashoffset .5s ease; }
     .ring .center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
     .ring .center b { font: 400 50px/.9 var(--font-num); color: var(--amber); font-variant-numeric: tabular-nums; }
     .ring .center small { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
@@ -124,8 +125,8 @@
       <div class="summary">
         <div class="ring" aria-hidden="true">
           <svg viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r="50" fill="none" stroke="var(--seat)" stroke-width="14"/>
-            <circle class="arc" id="ring-arc" cx="60" cy="60" r="50" fill="none" stroke="var(--amber)" stroke-width="14"
+            <circle cx="60" cy="60" r="50" fill="none" class="track" stroke-width="14"/>
+            <circle class="arc" id="ring-arc" cx="60" cy="60" r="50" fill="none" stroke-width="14"
                     stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
           </svg>
           <div class="center"><b data-k="in">0</b><small>/ <span data-k="total">0</span>명</small></div>
